@@ -1,4 +1,4 @@
-
+![Pipeline Architecture](./diagrams/pipeline-architecture.png)
 # NovaPay Digital Bank — Zero-Downtime CI/CD Pipeline Architecture
 
 ## AI Attribution
