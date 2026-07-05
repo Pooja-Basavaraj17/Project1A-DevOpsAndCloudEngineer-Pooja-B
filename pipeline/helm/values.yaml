@@ -1,0 +1,49 @@
+# NovaPay application Helm chart - base configuration
+# Environment-specific overrides in values-staging.yaml, values-production.yaml
+
+replicaCount: 10
+
+image:
+  repository: registry.novapay.internal/novapay-app
+  tag: "" # Set dynamically by pipeline to Git SHA - never 'latest'
+  pullPolicy: IfNotPresent
+
+resources:
+  limits:
+    cpu: "1"
+    memory: "1Gi"
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+
+securityContext:
+  runAsNonRoot: true
+  privileged: false
+  readOnlyRootFilesystem: true
+
+service:
+  type: ClusterIP
+  port: 8080
+
+canary:
+  enabled: true
+  steps:
+    - weight: 2
+      pauseDuration: "15m"
+    - weight: 10
+      pauseDuration: "30m"
+    - weight: 50
+      pauseDuration: "60m"
+    - weight: 100
+
+livenessProbe:
+  httpGet:
+    path: /actuator/health/liveness
+    port: 8080
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /actuator/health/readiness
+    port: 8080
+  periodSeconds: 5
