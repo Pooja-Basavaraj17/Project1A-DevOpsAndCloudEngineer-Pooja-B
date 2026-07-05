@@ -1,3 +1,4 @@
+![Deployment Topology](./diagrams/deployment-topology.png)
 
 # NovaPay Deployment Strategies: Blue-Green & Canary
 
