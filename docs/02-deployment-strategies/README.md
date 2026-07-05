@@ -79,3 +79,83 @@ release only ever affects the small percentage of users in the current phase bef
 caught, versus blue-green's atomic 100% switch. Blue-green remains available as a **fallback 
 for critical hotfixes** where canary's gradual timeline (110+ minutes to full rollout) is too 
 slow for the urgency of the fix.
+
+
+## Sample Argo Rollouts Configuration with Statistical Analysis
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: novapay-app-rollout
+  namespace: novapay-prod
+spec:
+  replicas: 20
+  strategy:
+    canary:
+      steps:
+        - setWeight: 2
+        - pause: {duration: 15m}
+        - analysis:
+            templates:
+              - templateName: novapay-canary-analysis
+        - setWeight: 10
+        - pause: {duration: 30m}
+        - analysis:
+            templates:
+              - templateName: novapay-canary-analysis
+        - setWeight: 50
+        - pause: {duration: 60m}
+        - analysis:
+            templates:
+              - templateName: novapay-canary-analysis
+        - setWeight: 100
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: novapay-canary-analysis
+spec:
+  metrics:
+    - name: error-rate-chi-squared
+      interval: 1m
+      successCondition: result.pValue > 0.05 and result.canaryRate <= result.baselineRate
+      failureLimit: 1
+      provider:
+        job:
+          spec:
+            template:
+              spec:
+                containers:
+                  - name: stats-job
+                    image: novapay/canary-stats:latest
+                    command: ["python3", "chi_squared_test.py"]
+                    args:
+                      - "--baseline-window=7d"
+                      - "--metric=error_rate"
+
+    - name: latency-welchs-ttest
+      interval: 1m
+      successCondition: result.pValue > 0.05 and result.canaryMean <= result.baselineMean
+      failureLimit: 1
+      provider:
+        job:
+          spec:
+            template:
+              spec:
+                containers:
+                  - name: stats-job
+                    image: novapay/canary-stats:latest
+                    command: ["python3", "welchs_ttest.py"]
+                    args:
+                      - "--baseline-window=7d"
+                      - "--metric=p99_latency"
+```
+
+**Design note:** Argo Rollouts' built-in Prometheus provider does simple threshold checks, 
+which isn't statistically rigorous enough for this use case. NovaPay's analysis uses a 
+custom `job` provider running a Python container that performs the actual Welch's t-test 
+and chi-squared test against a 7-day rolling baseline, returning a p-value. Promotion only 
+proceeds if the result shows 95% confidence that the canary is performing at least as well 
+as baseline.
