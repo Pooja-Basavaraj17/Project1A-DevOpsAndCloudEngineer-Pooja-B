@@ -1,0 +1,8 @@
+-- CONTRACT PHASE: Remove legacy email column
+-- IRREVERSIBLE - only run after confirming 100% of app instances are on V(N) for 7+ days
+-- Requires separate deployment with DBA approval gate (not bundled with Expand/Migrate)
+
+ALTER TABLE customer_profiles DROP COLUMN email;
+
+INSERT INTO schema_audit_log (migration_id, description, executed_by, phase)
+VALUES ('V2.2', 'Drop legacy email column', current_user, 'CONTRACT');
